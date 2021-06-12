@@ -1,0 +1,20 @@
+    json.dump()、json.dumps(),序列化(encoder)将字典转成json格式字符串，以便传输存储。
+    json.load()、json.loads(),反序列化(decoder)json格式字符串转换成字典，便于分析处理。
+
+    # if  one filefield  upload muti files use ：
+    files=  [
+        (
+        "field1",open("test1.png","rb")
+        ),
+        (
+        'filed2',open('a2.xlsx','rb').read()
+        )
+     ]
+
+    # if multi field upload several files use:
+
+    files= {
+    "field1" : ("filepath中的文件名称", open("filePath1", "rb")),
+      "field2" : ("filename2", open("filePath2", "rb"), "image/jpeg"),
+      "field3" : ("filename3", open("filePath3", "rb"), "image/jpeg", {"refer" : "localhost"})
+    }
