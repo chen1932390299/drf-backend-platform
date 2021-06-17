@@ -8,7 +8,7 @@ urlpatterns = [
          ),
     path('login/', LoginView.as_view({'post': 'create'})
          ),
-    path('index/', views.index,
+    path('trigger', views.trigger_view,
          ),
     path('testcase', views.TestCaseView.as_view({"get": 'list', 'post': 'create'})),
     path('testcase/<int:id>', views.TestCaseView.as_view({'get': 'retrieve',
@@ -27,5 +27,16 @@ urlpatterns = [
     path('testsuite/batch',views.BatchTestSuiteView.as_view({'delete':'batch_delete'})),
     path('testcase/batch',views.BatchTestCaseView.as_view({'delete':'batch_delete','post':'batch_run'})),
     path('testcase/status',views.ResultStatusView.as_view({'get':'get_status'})),
-    path('testcase/status/detail',views.FailedCaseView.as_view({'get':'get_status_detail'}))
+    path('testcase/status/detail',views.FailedCaseView.as_view({'get':'get_status_detail'})),
+
+    path('schedule',views.ScheduleView.as_view({'get':'list','post':'create'})),
+    path('schedule/<int:id>',views.ScheduleView.as_view(
+        {'get': 'retrieve',
+         'patch': 'patch', 'delete': 'destroy'}
+    )),
+    path('projects',views.ProejctConfigView.as_view({'get':'list','post':'create'})),
+    path('projects/<int:id>', views.ProejctConfigView.as_view({'delete': 'destroy'})),
+
 ]
+
+

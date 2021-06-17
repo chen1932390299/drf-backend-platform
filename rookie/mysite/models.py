@@ -45,8 +45,11 @@ def default_body():
     return {}
 
 
+
+
 class TestCase(models.Model):
     case_name = models.CharField(max_length=50, null=False, unique=True)
+    project_id =models.IntegerField(null=False)
     method = models.CharField(max_length=10, null=False)
     url = models.CharField(max_length=500, null=False)
     params = models.CharField(max_length=500, null=True)
@@ -95,3 +98,33 @@ class RunSuiteRecord(models.Model):
 
     class Meta:
         db_table = "tbl_runsuite_record"
+
+
+class ScheduleTrigger(models.Model):
+     choices = [('1','按日期执行'),('2','间隔周期执行'),('3',"cron 定时器执行")]
+     schedule_name = models.CharField(null=False,max_length=50)
+     schedule_args = models.JSONField(null=False)
+     schedule_type = models.CharField(choices=choices,max_length=10)
+     schedule_time  = models.CharField(max_length=50,null=False)
+     enable = models.BooleanField(null=False,default=False)
+     create_time = models.DateTimeField(auto_now_add=True, )
+     update_time = models.DateTimeField(auto_now=True)
+
+     class Meta:
+         db_table='tbl_schedule'
+         verbose_name="定时任务表"
+         ordering =["id"]
+
+class ProjectConfig(models.Model):
+    project_name = models.CharField(max_length=50,null=False,unique=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'tbl_project_config'
+        verbose_name = "项目配置表"
+        ordering = ["id"]
+
+
+
+

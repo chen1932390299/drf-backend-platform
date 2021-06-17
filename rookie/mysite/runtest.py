@@ -111,11 +111,11 @@ def run_test_case(case_id):
     test_case_data = serial_test_case.data
     extract_data = test_case_data.get("extract")
     assert_express = test_case_data.get("assert_express")
+    ret = execute_requests(case_id)
     try:
-        ret = execute_requests(case_id)
         response = ret.json()
     except Exception as e:
-        response = {"error": str(e)}
+        response = {"error": str(ret.text)}
     if response:
         TestCase.objects.filter(id=case_id).update(response=response)
         if extract_data:

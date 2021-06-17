@@ -30,3 +30,5 @@ class CustomViewSet(ModelViewSet):
 
         return CustomResponse(data=response.data, code=200,
                                msg='ok', success=True)
+
+

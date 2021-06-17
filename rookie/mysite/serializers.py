@@ -2,7 +2,8 @@ import datetime
 import re
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
-from .models import (RunSuiteRecord, User, TestCase, TestSuite, VariablesGlobal)
+from .models import (RunSuiteRecord, User,ProjectConfig,
+                     TestCase, TestSuite, VariablesGlobal,ScheduleTrigger)
 from utils.func_tools import iso2timestamp
 from rest_framework.validators import UniqueValidator
 
@@ -50,6 +51,8 @@ class SerializerTestCase(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     case_name = serializers.CharField(max_length=50, required=True,
                                       validators=[UniqueValidator(queryset=TestCase.objects.all())])
+    project_id = serializers.IntegerField(required=True,min_value=1)
+    project_name = serializers.SerializerMethodField()
     method = serializers.CharField(max_length=10, required=True)
     url = serializers.CharField(max_length=500, required=True)
     params = serializers.CharField(max_length=500, allow_blank=True, allow_null=True)
@@ -66,9 +69,15 @@ class SerializerTestCase(serializers.ModelSerializer):
 
     class Meta:
         model = TestCase
-        fields = ("id", "case_name", "method", "url", "params", "headers",
+        fields = ("id", "case_name","project_id","project_name" ,"method", "url", "params", "headers",
                   "mine_type", "body", "response", "extract", "assert_express", "error_msg",
                   "status", "create_time", "update_time")
+
+    def get_project_name(self,obj):
+          proejct_obj = ProjectConfig.objects.filter(id=obj.project_id).first()
+
+          return proejct_obj.project_name
+
 
 
 class SerialTestSuite(serializers.ModelSerializer):
@@ -102,3 +111,34 @@ class RunTestSuiteSerializer(serializers.ModelSerializer):
     class Meta:
         model = RunSuiteRecord
         fields = "__all__"
+
+
+class ScheduleSerializer(serializers.ModelSerializer):
+    choices = [('1', '按日期执行'), ('2', '间隔周期执行'), ('3', "cron 定时器执行")]
+    id = serializers.IntegerField(read_only=True)
+    schedule_args=serializers.ListField(required=True,child=serializers.IntegerField(min_value=1, max_value=999999), max_length=100)
+    schedule_type = serializers.ChoiceField(choices=choices,required=True)
+    schedule_time = serializers.CharField(max_length=50,required=True,
+                                          allow_null=False, allow_blank=False
+                                          )
+    enable =serializers.BooleanField(required=True)
+    create_time = serializers.DateTimeField(read_only=True)
+    update_time = serializers.DateTimeField(read_only=True)
+
+    class Meta:
+        model = ScheduleTrigger
+        fields="__all__"
+
+
+class ProjectSerializer(serializers.ModelSerializer):
+    id =serializers.IntegerField(read_only=True)
+    project_name = serializers.CharField(max_length=50,required=True,
+                                         validators=[UniqueValidator(queryset=ProjectConfig.objects.all())]
+                                         )
+    create_time = serializers.DateTimeField(read_only=True)
+    update_time = serializers.DateTimeField(read_only=True)
+
+
+    class Meta:
+        model = ProjectConfig
+        fields="__all__"

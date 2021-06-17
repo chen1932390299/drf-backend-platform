@@ -3,9 +3,10 @@ from django.core.cache import cache
 from rest_framework import filters, exceptions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .serializers import  UserSerializer, SerializerTestCase, \
-    SerialVaribales, SerialTestSuite,RunTestSuiteSerializer
-from .models import User, TestCase, VariablesGlobal, TestSuite, RunSuiteRecord
+from .serializers import  (UserSerializer, SerializerTestCase,ProjectSerializer,
+    SerialVaribales, SerialTestSuite,RunTestSuiteSerializer,ScheduleSerializer)
+from .models import (User, TestCase, VariablesGlobal,ProjectConfig,
+                     TestSuite, RunSuiteRecord,ScheduleTrigger)
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
 from .runtest import batch_run_test_case
@@ -28,27 +29,158 @@ from django.utils.decorators import method_decorator
 from rest_framework.mixins import CreateModelMixin, ListModelMixin, RetrieveModelMixin, DestroyModelMixin
 from rest_framework.generics import GenericAPIView, ListAPIView, CreateAPIView, RetrieveAPIView, DestroyAPIView
 from rest_framework.viewsets import ModelViewSet
+from apscheduler.schedulers.background import BackgroundScheduler
+from django_apscheduler.jobstores import DjangoJobStore, register_job
+from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.date import DateTrigger
 
+scheduler = BackgroundScheduler()  # 创建一个调度器对象
+scheduler.add_jobstore(DjangoJobStore(), "default")  # 添加一个作业
 
+if not scheduler.state:
+    scheduler.start()
+
+def test(*user_args):
+     import  time
+     print(user_args)
 @api_view(http_method_names=['GET', 'POST'])
-def index(request):
+def trigger_view(request):
     if request.method == 'GET':
         print(request.data)
         return Response({"message": "Got some data GET !", "data": request.data})
     if request.method == 'POST':
         print(request.data)
+
+
+        # scheduler = BackgroundScheduler()  # 创建一个调度器对象
+        # scheduler.add_jobstore(DjangoJobStore(), "default")  # 添加一个作业
+        try:
+
+            scheduler.remove_job(job_id='15')
+            scheduler.remove_job(job_id='24')
+            scheduler.remove_job(job_id='12')
+            scheduler.remove_job(job_id='hello world')
+            ids= scheduler.get_jobs()
+            print(ids)
+            print("开始任务")
+        except Exception as e:
+            print(e)
+            # scheduler.shutdown()
+
         return Response({"message": "Got some data POST!", "data": request.data})
-    return Response({"message": "Hello, world!"})
+
+
+class ScheduleView(CustomViewSet):
+   lookup_field = 'id'
+   queryset = ScheduleTrigger.objects.all()
+   serializer_class = ScheduleSerializer
+   parser_classes =  [JSONParser, FormParser]
+
+   def destroy(self, request, *args, **kwargs):
+       instance = self.get_object()
+       job_id = str(instance.id)
+       if scheduler.get_job(job_id=job_id) :
+           scheduler.remove_job(job_id=job_id)
+       self.perform_destroy(instance)
+       return CustomResponse(data=[],status=200,msg="删除ok",success=True)
+
+
+   def create(self, request, *args, **kwargs):
+       """  cron tigger need rewrite ,default */10"""
+       serializer = self.get_serializer(data=request.data)
+       serializer.is_valid(raise_exception=True)
+       self.perform_create(serializer)
+       try:
+
+           job_id =serializer.data.get('id')
+           if serializer.data.get("enable"):
+               if serializer.data.get('schedule_type') == '1':
+                   scheduler.add_job(test,
+                                     trigger=DateTrigger(run_date=serializer.data.get('schedule_time')),
+                                     id=str(job_id),
+                                     max_instances=1, replace_existing=True, args=serializer.data.get('schedule_args'))
+               if serializer.data.get('schedule_type') == '2':
+                   scheduler.add_job(test,
+                                     trigger=IntervalTrigger(seconds=int(serializer.data.get('schedule_time'))),
+                                     id=str(job_id),
+                                     max_instances=1, replace_existing=True, args=serializer.data.get('schedule_args'))
+
+               if serializer.data.get('schedule_type') == '3':
+                    scheduler.add_job(test,
+                                 trigger=CronTrigger(second="*/10"),
+                                 id=str(job_id),
+                                 max_instances=1, replace_existing=True, args=serializer.data.get('schedule_args'))
+               register_job(scheduler)
+
+
+       except Exception:
+           pass
+       headers = self.get_success_headers(serializer.data)
+       return CustomResponse(data=serializer.data, code=200,
+                             msg='ok', success=True,headers=headers)
 
 
 
+   def patch(self, request, *args, **kwargs):
+       """  cron tigger need rewrite ,default */10"""
+       instance = self.get_object()
+       job_id =  instance.id
+       enable = request.data.get("enable")
+       if scheduler.get_job(job_id=str(job_id)):
+           if not enable:
+                scheduler.pause_job(job_id=str(job_id))
+           if enable:
+               scheduler.resume_job(job_id=str(job_id))
+       else:
+           if enable:
+               if instance.schedule_type =='1':
+                   scheduler.add_job(test,
+                                     trigger=DateTrigger(run_date=instance.schedule_time),
+                                     id=str(job_id),
+                                     max_instances=1, replace_existing=True, args=instance.schedule_args)
+               if instance.schedule_type == '2':
+                   scheduler.add_job(test,
+                                     trigger=IntervalTrigger(seconds=int(instance.schedule_time)),
+                                     id=str(job_id),
+                                     max_instances=1, replace_existing=True, args=instance.schedule_args)
+               if instance.schedule_type == '3':
+
+                   scheduler.add_job(test,
+                                 trigger=CronTrigger(second="*/10"),
+                                 id=str(job_id),
+                                 max_instances=1, replace_existing=True, args=instance.schedule_args)
+               register_job(scheduler)
+
+
+       kwargs['partial'] = True
+       response =  self.update(request, *args, **kwargs)
+       return CustomResponse(data=response.data, code=200,
+                             msg='ok', success=True)
 
 
 class TestCaseView(CustomViewSet):
+    def get_queryset(self):
+        queryset = TestCase.objects.all()
+        status = self.request.query_params.get('status','')
+        project_id= self.request.query_params.get('project_id','')
+        if status or project_id:
+            if status and not project_id:
+                queryset = queryset.filter(status=status)
+            if not status and project_id:
+                queryset = queryset.filter(project_id=project_id)
+            if status and project_id:
+                queryset = queryset.filter(project_id=project_id,status=status)
+        return queryset
+
     lookup_field = 'id'
-    queryset = TestCase.objects.all()
+    queryset =get_queryset
     serializer_class = SerializerTestCase
     parser_classes = [JSONParser, FormParser]
+    filter_backends = [DjangoFilterBackend]  # filters.SearchFilter
+    filterset_fields = ['project_id','status']
+
+
 
 
 class ResultStatusView(CustomViewSet):
@@ -56,10 +188,16 @@ class ResultStatusView(CustomViewSet):
     queryset = TestCase.objects.all()
     serializer_class = SerializerTestCase
     parser_classes = [JSONParser, FormParser]
-
+    project_id = openapi.Parameter(name='project_id', in_=openapi.IN_QUERY, description="project_id",
+                                    type=openapi.TYPE_STRING)
+    @swagger_auto_schema(method='get', manual_parameters=[project_id])
     @action(methods=['get'], detail=False)
     def get_status(self, request, *args, **kwargs):
-        serial = SerializerTestCase(many=True, instance=self.get_queryset())
+        project_id = request.query_params.get('project_id', '')
+        if not project_id:
+            query_set = self.get_queryset()
+        else: query_set =self.get_queryset().filter(project_id=project_id)
+        serial = SerializerTestCase(many=True, instance=query_set)
         serial_data = serial.data
         if not serial_data:
             return CustomResponse(data=[], msg="not found data", code=200, success=False)
@@ -80,16 +218,21 @@ class FailedCaseView(CustomViewSet):
     queryset = TestCase.objects.all()
     serializer_class = SerializerTestCase
     parser_classes = [JSONParser, FormParser]
-    query_param = openapi.Parameter(name='status', in_=openapi.IN_QUERY, description="case status",
+    status = openapi.Parameter(name='status', in_=openapi.IN_QUERY, description="case status",
                                     type=openapi.TYPE_STRING)
-    @swagger_auto_schema(method='get', manual_parameters=[query_param])
+    project_id = openapi.Parameter(name='project_id', in_=openapi.IN_QUERY, description="project_id",
+                                    type=openapi.TYPE_STRING)
+    @swagger_auto_schema(method='get', manual_parameters=[status,project_id])
     @action(methods=['get'], detail=False)
     def get_status_detail(self, request,*args,**kwargs):
-        status = request.query_params.get('status', None)
+        status = request.query_params.get('status', '')
+        project_id = request.query_params.get('project_id', '')
         if not status and status not in ['0', '1', '2']:
             return CustomResponse(data=[], success=False,
                                   code=400, msg="请求参数错误: status must be in ['0','1','2']")
         inst = self.get_queryset().filter(status=status)
+        if project_id:
+            inst = self.get_queryset().filter(status=status,project_id=project_id)
         queryset = self.filter_queryset(inst)
         page = self.paginate_queryset(queryset)
         response =None
@@ -105,7 +248,7 @@ class FailedCaseView(CustomViewSet):
 
 
 def sync_run_cases(case_ids: list):
-    """ 异步执行用例任务"""
+    """同步阻塞执行用例任务"""
     batch_run_test_case(case_ids)
 
 
@@ -194,10 +337,16 @@ class BatchVariableView(CustomViewSet):
 
 
 class TestSuiteView(CustomViewSet):
+
+
     lookup_field = 'id'
     parser_classes = [JSONParser, FormParser]
     serializer_class = SerialTestSuite
-    queryset = TestSuite.objects.all()
+    queryset =TestSuite.objects.all()
+    filter_backends = [filters.SearchFilter]  # filters.SearchFilter
+    search_fields = ['suite_name']
+
+
 
 
 class BatchTestSuiteView(CustomViewSet):
@@ -279,7 +428,6 @@ class UserView(CustomViewSet):
     def create(self, request, *args, **kwargs):
 
         username = request.data.get('username')
-        print("get username is {}".format(username))
 
         users = User.objects.filter(username=username)
 
@@ -337,3 +485,17 @@ class VariableCheck(CustomViewSet):
             return CustomResponse(data=[], code=400, msg=arr, success=False)
         else:
             return CustomResponse(data=[], code=200, msg="重复检验通过", success=True)
+
+
+
+class  ProejctConfigView(CustomViewSet):
+
+    lookup_field = 'id'
+    serializer_class = ProjectSerializer
+    queryset = ProjectConfig.objects.all()
+    parser_classes = [JSONParser, FormParser]
+
+    filter_backends = [filters.SearchFilter]  # filters.SearchFilter
+    search_fields = ['project_name']
+
+

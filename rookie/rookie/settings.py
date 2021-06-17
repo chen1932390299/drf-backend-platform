@@ -25,7 +25,7 @@ SECRET_KEY = '^c8&g-i8npx3yzrq0$=srzfkacdo9t!$-sov$caui&ry@a9&39'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['*','192.168.96.55']
 
 
 # Application definition
@@ -43,7 +43,9 @@ INSTALLED_APPS = [
     'django_filters',
     "django_redis",  # redis
     'mysite',
+    'django_apscheduler', #  cron
     'django_mysql'
+
 
 
 ]

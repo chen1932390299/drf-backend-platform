@@ -26,11 +26,13 @@ class CustomResponse(Response):
             raise AssertionError(msg)
         self.code = code
         self.msg = msg
-        if data:
+        if data :
             if isinstance(data,list):
                 data ={'data':data}  # maybe data =  {**data} better
             if isinstance(data,(dict,QueryDict)):
-                if not data.get('data', None):
+                if 'data' in data.keys():
+                    data=data
+                else:
                     data = {"data": data}
         else:
             data = {"data": []}
