@@ -28,17 +28,11 @@ class RequestUtil(object):
     def jsonpath_extractor(json_expr: str, body, index=0):
         """
         @:param: json path expression $..data
-        @:param body the substitute body support [dict,str]
+        @:param body the substitute body normal see like str,dict list
         @index substitute value index default is 0 ,if -1 return all value
         """
-        if isinstance(body, str):
-            body = json.loads(body)
-        elif isinstance(body, (dict,list)):
-            pass
-        else:
-            raise ValueError("body type must be dict or string")
         extract_value = jsonpath.jsonpath(body, json_expr)
-        print(extract_value,"xxxxxxxxxxxxxxxxx")
+
         if extract_value:
             if index == -1:
                 return extract_value

@@ -72,7 +72,7 @@ class TestCase(models.Model):
 
 class TestSuite(models.Model):
     suite_name = models.CharField(max_length=50, null=False, default="0")
-    case_id = models.JSONField()
+    cases_list = models.JSONField()
     status = models.CharField(max_length=20, default="0")
 
     class Meta:

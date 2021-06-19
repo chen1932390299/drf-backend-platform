@@ -22,7 +22,6 @@ class UserSerializer(serializers.ModelSerializer):
 
     # 创建用户时更新密码为密文
     def create(self, validated_data):
-        print("进入创建保存用用户xxx")
         user = super().create(validated_data)
         user.set_password(validated_data['password'])
         user.save()
@@ -38,8 +37,6 @@ class UserSerializer(serializers.ModelSerializer):
 
     # 重写to_representation方法，自定义响应中的json数据
     def to_representation(self, instance):
-        print("xxxxxxxxx进入torepresentation ")
-        # 返回结果中id字段中间有横线，需要去除
         ret = super().to_representation(instance)
         ret['uuid'] = ret['uuid'].replace('-', '')
         return ret
@@ -59,7 +56,7 @@ class SerializerTestCase(serializers.ModelSerializer):
     headers = serializers.JSONField()
     mine_type = serializers.CharField(max_length=5, required=True)
     body = serializers.JSONField()
-    response = serializers.JSONField(read_only=True)
+    response = serializers.JSONField(required=False)
     extract = serializers.JSONField(required=False)
     assert_express = serializers.JSONField(required=False)
     error_msg = serializers.JSONField(required=False)
@@ -83,12 +80,12 @@ class SerializerTestCase(serializers.ModelSerializer):
 class SerialTestSuite(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     suite_name = serializers.CharField(max_length=50, required=True, allow_null=False, allow_blank=False)
-    case_id = serializers.JSONField(required=True)
+    cases_list = serializers.JSONField(required=True)
     status = serializers.CharField(max_length=20, required=False)
 
     class Meta:
         model = TestSuite
-        fields = ("id", "suite_name", "case_id", "status")
+        fields = ("id", "suite_name", "cases_list", "status")
 
 
 class SerialVaribales(serializers.ModelSerializer):

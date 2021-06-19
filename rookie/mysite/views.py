@@ -42,33 +42,26 @@ if not scheduler.state:
     scheduler.start()
 
 def test(*user_args):
-     import  time
-     print(user_args)
+     suite_ids = list(user_args)
+     print("xxxxx执行  %s"%suite_ids)
+     run_suites(suite_ids)
+
 @api_view(http_method_names=['GET', 'POST'])
 def trigger_view(request):
+    """ remove all jobs """
     if request.method == 'GET':
         print(request.data)
         return Response({"message": "Got some data GET !", "data": request.data})
     if request.method == 'POST':
         print(request.data)
-
-
-        # scheduler = BackgroundScheduler()  # 创建一个调度器对象
-        # scheduler.add_jobstore(DjangoJobStore(), "default")  # 添加一个作业
         try:
-
-            scheduler.remove_job(job_id='15')
-            scheduler.remove_job(job_id='24')
-            scheduler.remove_job(job_id='12')
-            scheduler.remove_job(job_id='hello world')
             ids= scheduler.get_jobs()
-            print(ids)
-            print("开始任务")
+            scheduler.remove_all_jobs()  # 移除所有job
         except Exception as e:
-            print(e)
+            pass
             # scheduler.shutdown()
 
-        return Response({"message": "Got some data POST!", "data": request.data})
+        return Response({"message": " remove all jobs  !", "data": request.data})
 
 
 class ScheduleView(CustomViewSet):
@@ -160,21 +153,21 @@ class ScheduleView(CustomViewSet):
 
 
 class TestCaseView(CustomViewSet):
-    def get_queryset(self):
-        queryset = TestCase.objects.all()
-        status = self.request.query_params.get('status','')
-        project_id= self.request.query_params.get('project_id','')
-        if status or project_id:
-            if status and not project_id:
-                queryset = queryset.filter(status=status)
-            if not status and project_id:
-                queryset = queryset.filter(project_id=project_id)
-            if status and project_id:
-                queryset = queryset.filter(project_id=project_id,status=status)
-        return queryset
+    # def get_queryset(self):
+    #     queryset = TestCase.objects.all()
+    #     status = self.request.query_params.get('status','')
+    #     project_id= self.request.query_params.get('project_id','')
+    #     if status or project_id:
+    #         if status and not project_id:
+    #             queryset = queryset.filter(status=status)
+    #         if not status and project_id:
+    #             queryset = queryset.filter(project_id=project_id)
+    #         if status and project_id:
+    #             queryset = queryset.filter(project_id=project_id,status=status)
+    #     return queryset
 
     lookup_field = 'id'
-    queryset =get_queryset
+    queryset =TestCase.objects.all()
     serializer_class = SerializerTestCase
     parser_classes = [JSONParser, FormParser]
     filter_backends = [DjangoFilterBackend]  # filters.SearchFilter
