@@ -147,15 +147,17 @@ def execute_requests(case_id):
     body = serial_data.get("body")
     # todo  prepare url ,params ,headers ,body
     ret = None
+    if url :
+        if RequestUtil.get_variable(url):
+            url = prepare_dict_or_str(url)
     if headers:
         if RequestUtil.get_variable(headers):
             headers = prepare_dict_or_str(headers)
 
     if method.upper() == "GET":
-        if RequestUtil.get_variable(url):
-            url = prepare_dict_or_str(url)
 
         ret = requests.request(method="get", url=url, headers=headers or {}, verify=False)
+
     elif method.upper() == "POST" or method.upper() == "PATCH" or method.upper() == "PUT":
 
         if mine_type == '2':  # multi-form-data

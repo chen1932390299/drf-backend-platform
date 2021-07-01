@@ -88,6 +88,7 @@ class RequestUtil(object):
         :return: [] or ['arg1', 'arg2', 'arg3']
         """
         var_list = re.findall(r"\${([\w_]+)}", json.dumps(body, separators=(',', ':')))
+
         return sorted(set(var_list), key=var_list.index) or []
 
     @staticmethod
@@ -100,6 +101,7 @@ class RequestUtil(object):
              c=replace_str(s,const_kwargs)
         :return: api/test?a=xxx&b=yyy
         """
+
         var_names = re.findall(r"\${([\w_]+)}", json.dumps(target_str, separators=(',', ':')))
         for var in var_names:
             target_str = target_str.replace("${" + var + "}", const_kwargs.get(var))

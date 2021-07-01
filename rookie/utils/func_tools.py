@@ -42,3 +42,14 @@ def timestamp2iso(timestamp, format='%Y-%m-%dT%H:%M:%S.%fZ'):
     sec = '{:0<6}'.format(sec)  # 长度位6，靠左剩下的用0补齐
     timestamp = float(str(timestamp)[:10])  # 转换为秒级时间戳
     return datetime.datetime.utcfromtimestamp(timestamp).strftime(format).replace('{-FF-}', sec)
+
+
+
+
+
+
+
+
+
+
+

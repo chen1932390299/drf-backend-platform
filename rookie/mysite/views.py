@@ -43,7 +43,6 @@ if not scheduler.state:
 
 def test(*user_args):
      suite_ids = list(user_args)
-     print("xxxxx执行  %s"%suite_ids)
      run_suites(suite_ids)
 
 @api_view(http_method_names=['GET', 'POST'])
@@ -101,7 +100,7 @@ class ScheduleView(CustomViewSet):
 
                if serializer.data.get('schedule_type') == '3':
                     scheduler.add_job(test,
-                                 trigger=CronTrigger(second="*/10"),
+                                 trigger=CronTrigger(second="*/600"),
                                  id=str(job_id),
                                  max_instances=1, replace_existing=True, args=serializer.data.get('schedule_args'))
                register_job(scheduler)
@@ -170,8 +169,9 @@ class TestCaseView(CustomViewSet):
     queryset =TestCase.objects.all()
     serializer_class = SerializerTestCase
     parser_classes = [JSONParser, FormParser]
-    filter_backends = [DjangoFilterBackend]  # filters.SearchFilter
+    filter_backends = [DjangoFilterBackend,filters.SearchFilter]  # filters.SearchFilter
     filterset_fields = ['project_id','status']
+    search_fields = ['case_name']
 
 
 
@@ -193,7 +193,7 @@ class ResultStatusView(CustomViewSet):
         serial = SerializerTestCase(many=True, instance=query_set)
         serial_data = serial.data
         if not serial_data:
-            return CustomResponse(data=[], msg="not found data", code=200, success=False)
+            return CustomResponse(data=[], msg="not found data", code=200, success=True)
         success_count = len(list(filter(lambda item: item.get("status") == '2', serial_data)))
         failed_count = len(list(filter(lambda item: item.get("status") == '1', serial_data)))
         undefined_count = len(list(filter(lambda item: item.get("status") == '0', serial_data)))
@@ -465,7 +465,7 @@ class VariableCheck(CustomViewSet):
     parser_classes = [JSONParser, FormParser]
     serializer_class = SerialVaribales
     queryset = VariablesGlobal.objects.all()
-    filter_backends = [BatchFilterVariable]  # filters.SearchFilter
+    filter_backends = [BatchFilterVariable]
     filterset_fields = ['name']
 
     def list(self, request, *args, **kwargs):

@@ -1,7 +1,0 @@
-tuncate TABLE  tbl_case_info;
-tuncate TABLE  tbl_runsuite_record;
-
-tuncate TABLE  tbl_test_suite;
-
-TRUNCATE TABLE  tbl_global_variables;
-

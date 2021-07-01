@@ -1,0 +1,62 @@
+version: '3'
+
+services:
+  mysql:
+    image: mysql:8.0.13
+    container_name: mysql
+    hostname: mysql
+    restart: always
+    security_opt:
+      - seccomp:unconfined
+    volumes:
+      - ./mysql:/var/lib/mysql  # 把当前文件夹下的 ./mysql文件夹挂载到docker容器 /var/lib/mysql 路径下
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_HOST=mysql
+      - MYSQL_ROOT_PASSWORD=App@123456
+      - MYSQL_DATABASE=drf_backend
+      - MYSQL_USER=App
+      - MYSQL_PASSWORD=App@123456
+    command:
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_general_ci
+      --explicit_defaults_for_timestamp=true
+      --lower_case_table_names=1
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./rookie/static:/code/rookie/static
+      - ./rookie/script:/code/rookie/script
+      - ./default.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - rookie
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+    restart: always
+  rookie:
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command:  /bin/bash -c "python manage.py makemigrations&&python manage.py migrate&& uwsgi --ini uwsgi.ini && ps -ef |grep uwsgi"
+    working_dir: /code/rookie
+    container_name: rookie
+    restart: always
+    hostname: rookie
+    volumes:
+      - .:/code # 将当前文件夹下所有文件挂载到容器的 /code 下
+    expose:
+      - "8000"
+      - "8001"
+    depends_on:
+      - mysql
+      - redis
+
