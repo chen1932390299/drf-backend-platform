@@ -6,18 +6,19 @@
 
 * django restf framework
 
+
 #### 2.components
 * mysql8.x
 * redis
 * nginx
 #### 3.before deploy  need prepare
->###### install docker:
-    >[https://www.runoob.com/docker/centos-docker-install.html](https://www.runoob.com/docker/centos-docker-install.html)
+###### install docker:
+[https://www.runoob.com/docker/centos-docker-install.html](https://www.runoob.com/docker/centos-docker-install.html)
 
 
 * * *
->###### install docker-compose:
-    > [https://www.runoob.com/docker/docker-compose.html](https://www.runoob.com/docker/docker-compose.html)
+###### install docker-compose:
+[https://www.runoob.com/docker/docker-compose.html](https://www.runoob.com/docker/docker-compose.html)
 
 
 #### 4. deploy (execute  at docker-compose.yml dir )
@@ -47,7 +48,7 @@ docker-compose up -d 或者 docker-compose
 #### 7.frequently asked question (FAQ):
 ###### 1.django.db.utils.OperationalError: (1067, "Invalid default value for 'project_name'")
 
-* * *
+
 
 *  solution:
 
@@ -57,8 +58,7 @@ docker-compose up -d 或者 docker-compose
 * * *
 
 
-    `
-    ```
+
     services: 
         mysql:   
             image: mysql:5.7   
@@ -80,9 +80,10 @@ docker-compose up -d 或者 docker-compose
                     --collation-server=utf8mb4_unicode_ci
 
 
+* * *
 
-    ```
-    `
+
+
 
 
 2. ###### mysqlclient  install failed ：
@@ -90,15 +91,11 @@ docker-compose up -d 或者 docker-compose
 
 3. ###### about docker-compose :
 
-* * *
-
 * docker-compose up 本质是docker-compose logs -f，它会收集所有容器的日志输出直到退出命令，或者容器都停止运行
 
 * docker-compose up -d 以后台的方式运行容器。不会在终端上打印运行日志
 
-* * *
 
-* * *
 
 4. ###### more about docker-compose usage you can see by :
 
@@ -106,7 +103,6 @@ docker-compose up -d 或者 docker-compose
 
 *    docker-compose --help
 
-* * *
 
 
 
@@ -118,6 +114,20 @@ docker-compose up -d 或者 docker-compose
 * * *
 #####  more issue support please contact with  us :
 QQ Group: 796245415
+
+            へ　　　　　／|
+        　　/＼7　　　 ∠＿/
+        　 /　│　　 ／　／
+        　│　Z ＿,＜　／　　 /`ヽ
+        　│　　　　　ヽ　　 /　　〉
+        　 Y　　　　　`　 /　　/
+        　ｲ●　､　●　　⊂⊃〈　　/
+        　()　 へ　　　　|　＼〈
+        　　>ｰ ､_　 ィ　 │ ／／
+        　 / へ　　 /　ﾉ＜| ＼＼
+        　 ヽ_ﾉ　　(_／　 │／／
+        　　7　　　　　　　|／
+        　　＞―r￣￣`ｰ―＿
 
 
 
