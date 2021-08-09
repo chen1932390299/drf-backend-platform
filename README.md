@@ -4,7 +4,7 @@
 
 * python  3.6.6
 
-* django restf framework
+* django rest framework
 
 
 #### 2.components
@@ -26,7 +26,7 @@ docker-compose build
 
 docker-compose up -d 或者 docker-compose
 
-#### 5.validate delpoy
+#### 5.validate deploy
 * open chrome and input following format and enter :
  ${your_server_ip}:80/swagger-mysite/
 

@@ -15,6 +15,8 @@ class User(models.Model):
     password = models.CharField(max_length=256)
     mobile = models.CharField(max_length=11, blank=True, unique=True)  # 可选
     email = models.EmailField(max_length=64, blank=True, unique=True)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
 
     # role = models.ManyToManyField(to=Roles, related_name='role')
 
@@ -23,14 +25,30 @@ class User(models.Model):
         return None
 
     def check_pwd(self, password):
-        # password 入参原始密码，数据库密码
+        # password 入参原始密码
         db_pwd = self.password
         return check_password(password, db_pwd)
 
     class Meta:
         db_table = "tbl_user"
         verbose_name = 'user信息表'
+        ordering=["id"]
+        unique_together = (
+            ('username', 'mobile')
+        )
 
+class RoleInfo(models.Model):
+    choices=[('0','普通角色'),('1',"管理员")]
+    status_enum= [('0','禁用'),('1',"启用")]
+
+    role_name = models.CharField(max_length=50,unique=True)
+    role_type = models.CharField(choices=choices,max_length=10,default='0')
+    status = models.CharField(choices=status_enum,max_length=10,default=1)
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+    class  Meta:
+        db_table = "tbl_role_info"
+        ordering = ["-create_time"]
 
 class BaseModel(models.Model):
     create_time = models.DateTimeField(auto_now_add=True)
@@ -94,11 +112,39 @@ class VariablesGlobal(models.Model):
 
 
 class RunSuiteRecord(models.Model):
+    choices=[('0',"未执行"),('1','执行失败'),('2',"执行成功")]
+    taskid =  models.UUIDField(default=UUIDTools.uuid4_hex)
     suite_ids = models.JSONField()
-
+    status=models.CharField(choices=choices,default='0',max_length=10)
+    create_by = models.CharField(default="系统",max_length=50)
+    create_time = models.DateTimeField(auto_now_add=True, )
+    update_time = models.DateTimeField(auto_now=True)
     class Meta:
         db_table = "tbl_runsuite_record"
+        ordering=["-create_time"]
 
+class TaskExcuteRecord(models.Model):
+    taskid = models.UUIDField()
+    suite_id = models.IntegerField()
+    case_id = models.IntegerField()
+    case_name = models.CharField(max_length=50, null=False)
+    project_id =models.IntegerField(null=False)
+    method = models.CharField(max_length=10, null=False)
+    url = models.CharField(max_length=500, null=False)
+    params = models.CharField(max_length=500, null=True)
+    headers = models.JSONField(null=True)
+    mine_type = models.CharField(max_length=5)
+    body = models.JSONField(null=True)
+    response = models.JSONField(null=True)
+    extract = models.JSONField(null=True)
+    assert_express = models.JSONField(null=True)
+    error_msg = models.JSONField(null=True)
+    status = models.CharField(max_length=20, default="0")
+    create_time = models.DateTimeField(auto_now_add=True)
+    update_time = models.DateTimeField(auto_now=True)
+    class Meta:
+        db_table="tbl_task_execute_record"
+        ordering=["id"]
 
 class ScheduleTrigger(models.Model):
      choices = [('1','按日期执行'),('2','间隔周期执行'),('3',"cron 定时器执行")]

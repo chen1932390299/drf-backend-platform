@@ -3,15 +3,18 @@ from django.core.cache import cache
 from rest_framework import filters, exceptions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from .serializers import  (UserSerializer, SerializerTestCase,ProjectSerializer,
+from  . import serializers
+from . import  models
+from .serializers import  (UserSerializer, SerializerTestCase,ProjectSerializer,TaskExcuteSerializer,
     SerialVaribales, SerialTestSuite,RunTestSuiteSerializer,ScheduleSerializer)
-from .models import (User, TestCase, VariablesGlobal,ProjectConfig,
+from .models import (User, TestCase, VariablesGlobal,ProjectConfig,TaskExcuteRecord,
                      TestSuite, RunSuiteRecord,ScheduleTrigger)
 from drf_yasg.utils import swagger_auto_schema
 from drf_yasg import openapi
+from drf_yasg.openapi import  Schema
 from .runtest import batch_run_test_case
 from utils.viewsets import CustomViewSet
-from rest_framework.decorators import api_view
+from rest_framework.decorators import api_view,authentication_classes
 from rest_framework.parsers import JSONParser, FormParser
 from rest_framework import filters
 from asgiref.sync import sync_to_async
@@ -34,7 +37,7 @@ from django_apscheduler.jobstores import DjangoJobStore, register_job
 from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 from apscheduler.triggers.date import DateTrigger
-
+from concurrent.futures import ThreadPoolExecutor
 scheduler = BackgroundScheduler()  # 创建一个调度器对象
 scheduler.add_jobstore(DjangoJobStore(), "default")  # 添加一个作业
 
@@ -254,8 +257,8 @@ class BatchTestCaseView(CustomViewSet):
 
     query_param = openapi.Parameter(name='case_ids', in_=openapi.IN_QUERY, description="用例id",
                                     type=openapi.TYPE_STRING)
-    body = openapi.Parameter(name="case_ids", in_=openapi.IN_BODY, description='case_ids'
-                             , type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_INTEGER))
+    # body = openapi.Parameter(name="case_ids", in_=openapi.IN_BODY, description='case_ids'
+    #                          , type=openapi.TYPE_ARRAY, items=openapi.Items(type=openapi.TYPE_INTEGER))
 
     @swagger_auto_schema(method='delete', manual_parameters=[query_param])
     @action(methods=['delete'], detail=False)
@@ -342,6 +345,9 @@ class TestSuiteView(CustomViewSet):
 
 
 
+
+
+
 class BatchTestSuiteView(CustomViewSet):
     """
     custom batch delete or single delete with suite_ids
@@ -402,15 +408,14 @@ class LoginView(CustomViewSet):
         username = request.data.get('username')
         password = request.data.get('password')
         user = User.objects.filter(username=username).first()
-        if not user:
-            raise exceptions.ValidationError(detail='username错误')
-        if not user.check_pwd(password):
-            raise exceptions.ValidationError(detail='密码错误')
+        if not user or not user.check_pwd(password):
+            raise exceptions.AuthenticationFailed(detail='用户名或密码错误')
         key = uuid.uuid1().hex
-        cache.set(key, user.id, 120)
+        cache.set(key, user.id, 300)
         serial = UserSerializer(instance=user)
         return CustomResponse(data={'token': key, **serial.data}, code=200,
                               msg='ok', success=True)
+
 
 
 class UserView(CustomViewSet):
@@ -420,27 +425,59 @@ class UserView(CustomViewSet):
 
     def create(self, request, *args, **kwargs):
 
-        username = request.data.get('username')
-
-        users = User.objects.filter(username=username)
-
-        if not users:
-            serial = UserSerializer(data=request.data)
-            if serial.is_valid():
-                serial.save()
-                return CustomResponse(data=serial.data, code=200, msg='ok', success=True)
-            else:
-                return CustomResponse(data=serial.errors, code=400, msg='', success=False)
+        serial = UserSerializer(data=request.data)
+        if serial.is_valid():
+            serial.save()
+            return CustomResponse(data=serial.data, code=200, msg='ok', success=True)
         else:
-            return CustomResponse(data={}, code=400, msg='用户已存在', success=False)
+            return CustomResponse(data=serial.errors, code=400, msg='', success=False)
 
 
+class UserInfo(CustomViewSet):
+    parser_classes = [JSONParser, FormParser]
+    serializer_class = UserSerializer
+    queryset = User.objects.all()
 
-def sync_function(suite_ids):
-    run_suites(suite_ids)
+    @swagger_auto_schema(method='patch',
+                         request_body=openapi.Schema(
+                             type=openapi.TYPE_OBJECT,
+                             required=['new_password','username','password'],
+
+                             properties=
+                             {
+                                 'username':openapi.Schema(type=openapi.TYPE_STRING,description='用户名'),
+                                 'password':openapi.Schema(type=openapi.TYPE_STRING,description='旧密码'),
+                                 'new_password': openapi.Schema(type=openapi.TYPE_STRING,description='新密码')
+                             }
+                         ),
+                         operation_description='修改用户信息'
+
+                         )
+    @action(methods=['patch'], detail=False)
+    def change_password(self, request, *args, **kwargs):
+        user_info =  request.data
+        obj = User.objects.filter(username=user_info.get("username")).first()
+        if not obj or not obj.check_pwd(user_info.get("password")) :
+            return  CustomResponse(data=[], code=400,
+                                  msg='输入用户名或者旧密码错误！', success=False)
+        serial = UserSerializer(instance=obj,partial=True,data={"password":user_info.get("new_password")})
+        if serial.is_valid():
+            serial.save()
+        return  CustomResponse(data=[], code=200,
+                                  msg='修改信息成功！', success=True)
+
+class RoleInfoView(CustomViewSet):
+    serializer_class = serializers.RoleSerializer
+    queryset = models.RoleInfo.objects.all()
+    parser_classes = [JSONParser, FormParser]
+
+
+def sync_function(suite_ids,taskid=None):
+   run_suites(suite_ids,taskid=taskid)
 
 
 class RunTestSuite(CustomViewSet):
+    """ 线程池executor异步调用执行任务"""
     lookup_field = 'id'
     parser_classes = [JSONParser]
     serializer_class = RunTestSuiteSerializer
@@ -451,14 +488,29 @@ class RunTestSuite(CustomViewSet):
         if serial.is_valid():
             serial.save()
             data = serial.data
-            async_task = sync_to_async(sync_function(data.get("suite_ids"))
-                                       , thread_sensitive=True)
+            with ThreadPoolExecutor() as executor:
+                executor.submit(sync_function,
+                                data.get("suite_ids"),taskid=data.get("taskid"))
             return CustomResponse(data=data, code=200,
                                   msg='提交任务ok', success=True)
         else:
             return CustomResponse(data=serial.errors,
                                   code=400, msg='创建失败', success=False)
+class TaskExecuteView(CustomViewSet):
+    """ 任务记录视图"""
+    lookup_field = 'taskid'
+    parser_classes = [JSONParser,FormParser]
+    serializer_class = TaskExcuteSerializer
+    queryset = TaskExcuteRecord.objects.all()
 
+    def get_task_items(self, request, *args, **kwargs):
+
+        task_id =kwargs.get("taskid")
+        objs = self.queryset.filter(taskid=task_id)
+        serial =TaskExcuteSerializer(instance=objs,many=True)
+        data = serial.data
+        return CustomResponse(data=data, code=200,
+                              msg='ok', success=True)
 
 class VariableCheck(CustomViewSet):
     lookup_field = 'id'

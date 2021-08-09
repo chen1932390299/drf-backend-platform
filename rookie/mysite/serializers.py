@@ -3,22 +3,30 @@ import re
 from rest_framework import serializers
 from rest_framework.exceptions import ValidationError
 from .models import (RunSuiteRecord, User,ProjectConfig,
-                     TestCase, TestSuite, VariablesGlobal,ScheduleTrigger)
-from utils.func_tools import iso2timestamp
-from rest_framework.validators import UniqueValidator
-
+                     TestCase, TestSuite, VariablesGlobal,ScheduleTrigger,TaskExcuteRecord)
+from  . import models
+from rest_framework.validators import UniqueValidator,UniqueTogetherValidator
 
 
 class UserSerializer(serializers.ModelSerializer):
     # style表示前台输入是密文，write_only表示序列化时不会序列化该字段
     password = serializers.CharField(write_only=True, max_length=256)
-
+    uuid = serializers.UUIDField(read_only=True)
+    create_time = serializers.DateTimeField(read_only=True)
+    update_time = serializers.DateTimeField(read_only=True)
     class Meta:
         model = User
-        fields = ('uuid', 'username', 'password', 'mobile', 'email')
+        fields = ('id','uuid', 'username', 'password', 'mobile', 'email','create_time','update_time')
         extra_kwargs = {
             "password": {"write_only": True}
         }
+
+        validators = [
+            UniqueTogetherValidator(
+                queryset=User.objects.all(),
+                fields=['username', 'mobile']
+            )
+        ]
 
     # 创建用户时更新密码为密文
     def create(self, validated_data):
@@ -41,8 +49,21 @@ class UserSerializer(serializers.ModelSerializer):
         ret['uuid'] = ret['uuid'].replace('-', '')
         return ret
 
+class RoleSerializer(serializers.ModelSerializer):
 
+    role_type_value = serializers.CharField(source="get_role_type_display",max_length=10,read_only=True)
+    status_value = serializers.CharField(source="get_status_display",max_length=10,read_only=True)
 
+    class Meta:
+        model = models.RoleInfo
+        fields= ['id','role_name','role_type','role_type_value',
+                 'status','status_value','create_time','update_time']
+        validators = [
+            UniqueTogetherValidator(
+                queryset=models.RoleInfo.objects.all(),
+                fields=['role_name']
+            )
+        ]
 
 class SerializerTestCase(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
@@ -81,11 +102,18 @@ class SerialTestSuite(serializers.ModelSerializer):
     id = serializers.IntegerField(read_only=True)
     suite_name = serializers.CharField(max_length=50, required=True, allow_null=False, allow_blank=False)
     cases_list = serializers.JSONField(required=True)
+    items = serializers.SerializerMethodField()
     status = serializers.CharField(max_length=20, required=False)
-
+    # obj represent TestSuite object
+    def get_items(self,testsuite_obj):
+        instances = TestCase.objects.filter(id__in=[item.get("id") for item in testsuite_obj.cases_list])
+        data = []
+        for instance in  instances:
+            data.append({"id":instance.id,"name":instance.case_name,"status":instance.status})
+        return data
     class Meta:
         model = TestSuite
-        fields = ("id", "suite_name", "cases_list", "status")
+        fields = ("id", "suite_name", "cases_list", "status","items")
 
 
 class SerialVaribales(serializers.ModelSerializer):
@@ -103,12 +131,39 @@ class SerialVaribales(serializers.ModelSerializer):
 
 
 class RunTestSuiteSerializer(serializers.ModelSerializer):
+    taskid = serializers.UUIDField(read_only=True)
     suite_ids = serializers.ListField(child=serializers.IntegerField(min_value=1, max_value=999999), max_length=100)
+    suite_items = serializers.SerializerMethodField()
+    status =  serializers.ChoiceField(choices=[('0',"未执行"),('1','执行失败'),('2',"执行成功")],required=False)
+    status_name = serializers.CharField(source="get_status_display",read_only=True)
+    create_by = serializers.CharField(max_length=50,required=False)
+    create_time = serializers.DateTimeField(read_only=True)
+    update_time = serializers.DateTimeField(read_only=True)
 
+    def get_suite_items(self,obj):
+        serial  = SerialTestSuite(instance=TestSuite.objects.filter(id__in=obj.suite_ids),many=True)
+        return  serial.data
     class Meta:
         model = RunSuiteRecord
-        fields = "__all__"
+        fields = ['taskid','suite_ids','suite_items','status','status_name','create_by','create_time','update_time']
 
+
+class TaskExcuteList(serializers.ListSerializer):
+    def update(self, instance_queryset, validated_data_list):
+        queryset=[]
+        for index, validated_data in enumerate(validated_data_list):
+            inst=self.child.update(instance_queryset[index], validated_data)
+            queryset.append(inst)
+        return queryset
+
+class TaskExcuteSerializer(serializers.ModelSerializer):
+    params = serializers.CharField(max_length=500, allow_blank=True, allow_null=True)
+    create_time = serializers.DateTimeField(read_only=True)
+    update_time = serializers.DateTimeField(read_only=True)
+    class Meta:
+        model = TaskExcuteRecord
+        fields = "__all__"
+        list_serializer_class = TaskExcuteList
 
 class ScheduleSerializer(serializers.ModelSerializer):
     choices = [('1', '按日期执行'), ('2', '间隔周期执行'), ('3', "cron 定时器执行")]

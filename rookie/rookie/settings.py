@@ -23,7 +23,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 SECRET_KEY = '^c8&g-i8npx3yzrq0$=srzfkacdo9t!$-sov$caui&ry@a9&39'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 ALLOWED_HOSTS = ['*','192.168.96.55']
 
@@ -90,10 +90,10 @@ WSGI_APPLICATION = 'rookie.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': "drf_backend",
-        'USER': 'App',  # root default local
+        'NAME': "mall", #drf_backend
+        'USER': 'root',  # root default local ,docker is App
         'PASSWORD': 'App@123456',
-        'HOST': 'db',
+        'HOST': '192.168.110.151',# db
         'PORT': '3306',
         'OPTIONS': {
             # Tell MySQLdb to connect with 'utf8mb4' character set

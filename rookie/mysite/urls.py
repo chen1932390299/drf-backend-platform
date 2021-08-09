@@ -1,10 +1,15 @@
 from django.urls import path, re_path
-from .views import ( UserView, LoginView,TestSuiteView)
+from .views import ( UserView, LoginView,TestSuiteView,UserInfo,TaskExecuteView)
 
 from . import views
 
 urlpatterns = [
+    path('role/info', views.RoleInfoView.as_view({'get': 'list', 'post': 'create'})),
+    path('task/record',TaskExecuteView.as_view({'get':'list'})),
+    path('task/record/<str:taskid>',TaskExecuteView.as_view({'get':'get_task_items'})),
     path('regist/', UserView.as_view({'post': 'create'})
+         ),
+    path('userInfo/', UserInfo.as_view({ 'patch': 'change_password','get':'list'})
          ),
     path('login/', LoginView.as_view({'post': 'create'})
          ),

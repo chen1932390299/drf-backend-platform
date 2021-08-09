@@ -2,12 +2,12 @@ import json
 import re
 import operator
 import jsonpath
-
+from mysite.function_plugin import hook_replace
 
 class RequestUtil(object):
 
     @staticmethod
-    def substitute_variable(data: dict, const_kwargs: dict) -> dict:
+    def substitute_variable(data, const_kwargs: dict) -> dict:
         """
         @:param data of  contains ${var_name},type is dict
         @:param replace_kwargs is the replace kwargs
@@ -22,6 +22,8 @@ class RequestUtil(object):
                 ret = dump_string.replace('${' + str(k) + '}', str(v))
                 dump_string = ret
         serial = json.loads(dump_string)
+
+
         return serial
 
     @staticmethod
@@ -85,6 +87,7 @@ class RequestUtil(object):
     def get_variable(body:(dict,str,list)):
         """
         :param body:
+         匹配${v}返回数组
         :return: [] or ['arg1', 'arg2', 'arg3']
         """
         var_list = re.findall(r"\${([\w_]+)}", json.dumps(body, separators=(',', ':')))
@@ -94,11 +97,13 @@ class RequestUtil(object):
     @staticmethod
     def replace_str(target_str, const_kwargs):
         """
-        :replace string  ${var}
+        :args： target_str ,const_kwargs
+
         example:
              const_kwargs={"pwd":"xxx","var":"yyy"}
-             s= "api/test?a=${pwd}&b=${var}"
-             c=replace_str(s,const_kwargs)
+             path= "api/test?a=${pwd}&b=${var}"
+             req_path=replace_str(path,const_kwargs)
+
         :return: api/test?a=xxx&b=yyy
         """
 

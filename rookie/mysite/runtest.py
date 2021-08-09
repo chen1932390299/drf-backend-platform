@@ -1,28 +1,50 @@
 import requests
 import urllib3
 import json
-from .models import TestSuite, TestCase, VariablesGlobal
-from .serializers import SerialTestSuite, SerializerTestCase, SerialVaribales
+from .models import TestSuite, TestCase, VariablesGlobal,TaskExcuteRecord,RunSuiteRecord
+from .serializers import SerialTestSuite, SerializerTestCase,TaskExcuteSerializer,RunTestSuiteSerializer
 from .request_util import RequestUtil
-
+from django.forms.models import model_to_dict
 urllib3.disable_warnings()
+from mysite.function_plugin import hook_replace
 
-
-def run_suites(suite_ids):
+def run_suites(suite_ids,taskid=None):
     """
     sync block run each test suite
     :param suite_ids:
     :return: None
     """
-    for suite_id in suite_ids:
-        run_suite(suite_id)
+    if not taskid:
+        for suite_id in suite_ids:
+            run_suite(suite_id)
+    else:
+
+        for suite_id in suite_ids:
+            run_suite(suite_id,taskid=taskid)
+
+        # judge task status
+        task_items = TaskExcuteRecord.objects.filter(taskid=taskid)
+        status_list = [task_item.status for  task_item in task_items]
+        inst = RunSuiteRecord.objects.filter(taskid=taskid).first()
+        if status_list.count('0') == len(status_list):
+            serial = RunTestSuiteSerializer(instance=inst,data={'status':'0'},partial=True)
+        elif status_list.count('2') == len(status_list):
+            serial = RunTestSuiteSerializer(instance=inst, data={'status': '2'},partial=True)
+        else :
+            serial = RunTestSuiteSerializer(instance=inst, data={'status':'1'},partial=True)
+        if serial.is_valid():
+            serial.save()
 
 
-def run_suite(suite_id):
+
+    # write  task record of taskid,suiteid ,caseid ,method ,url  ,response,error status ,runtime
+
+
+def run_suite(suite_id,taskid=None):
     """
     :param suite_id:
     :return: None
-    test case status enum: {"0":"未知","1":"失败","2":"成功"}
+    test case status enum: {"0":"全部未执行","1":"全部失败","2":"成功","3":"部分失败"}
     """
     # get one test suite
     inst = TestSuite.objects.filter(id=suite_id).first()
@@ -44,13 +66,28 @@ def run_suite(suite_id):
     # all success
     elif status_all.count('2') == len(status_all):
         TestSuite.objects.filter(id=suite_id).update(status='2')
-    # 全部未执行
+    # all not run
     elif status_all.count('0') == len(status_all):
         TestSuite.objects.filter(id=suite_id).update(status='0')
-    # 部分失败
+    # partial failed
     else:
         # status_all.count('1')>1 and status_all.count('1') <len(status_all)
         TestSuite.objects.filter(id=suite_id).update(status='3')
+    if taskid:
+        objs = TestCase.objects.filter(id__in=caseIds)
+        # write suite_id,taskid, obj.data
+        querysets = []
+        for obj in objs :
+            extra_kwarg = model_to_dict(obj)
+            extra_kwarg["case_id"]=extra_kwarg.pop("id")
+            task_obj= {"suite_id":suite_id,"taskid":taskid,**extra_kwarg}
+            print(task_obj)
+            querysets.append(task_obj)
+        serial_task_execute = TaskExcuteSerializer(data= querysets,many=True)
+        if serial_task_execute.is_valid(raise_exception=True):
+            serial_task_execute.save()
+
+
 
 
 def run_test_case(case_id):
@@ -148,12 +185,19 @@ def execute_requests(case_id):
     # todo  prepare url ,params ,headers ,body
     ret = None
     if url :
+        # 准备url参数化和函数助手替换
         if RequestUtil.get_variable(url):
             url = prepare_dict_or_str(url)
+            url = prepare_func(url)
+        else:
+            url =prepare_func(url)
+
     if headers:
         if RequestUtil.get_variable(headers):
             headers = prepare_dict_or_str(headers)
-
+            headers=prepare_func(headers)
+        else:
+            headers =  prepare_func(headers)
     if method.upper() == "GET":
 
         ret = requests.request(method="get", url=url, headers=headers or {}, verify=False)
@@ -177,6 +221,9 @@ def execute_requests(case_id):
             files = [(k, requests.get(v).content) for k, v in file_urls]
             if RequestUtil.get_variable(data):
                 data = prepare_dict_or_str(data)
+                data = prepare_func(data)
+            else:
+                data = prepare_func(data)
             ret = requests.request(method="post", url=url,
                                    data=data, files=files, headers=headers or {}, verify=False)
         elif mine_type == '3':  # form-data
@@ -187,10 +234,18 @@ def execute_requests(case_id):
             # if exists  ${var} in post data body use substituted data
             if RequestUtil.get_variable(data):
                 data = prepare_dict_or_str(data)
+                data =prepare_func(data)
+            else :
+                data =prepare_func(data)
             ret = requests.request("post", url, data=data, headers=headers or {}, verify=False)
-        elif mine_type == '4':  # json
+        elif mine_type == '4' or 4:  # json
             if RequestUtil.get_variable(body):
+
                 body = prepare_dict_or_str(body)
+                body = prepare_func(body)
+            else :
+                body = prepare_func(body)
+
             ret = requests.request("post", url, json=body, headers=headers or {}, verify=False)
         else:
             pass
@@ -198,8 +253,8 @@ def execute_requests(case_id):
     elif method.upper() == "DELETE":
         if params and mine_type == '1':
 
-            if RequestUtil.get_variable(url):
-                url = prepare_dict_or_str(url)
+            # if RequestUtil.get_variable(url):
+            #     url = prepare_dict_or_str(url)
             ret = requests.request(method="delete", url=url, verify=False, headers=headers or {})
         # delete form-data or json
         if mine_type in ['3', '4'] and not params:
@@ -210,14 +265,25 @@ def execute_requests(case_id):
                     k = value.get('key')
                     v = value.get("value")
                     data[k] = v
+
+                if RequestUtil.get_variable(data):
+                    data = prepare_dict_or_str(data)
+                    data = prepare_func(data)
+                else:
+                    data = prepare_func(data)
                 ret = requests.request("delete", url, data=data, headers=headers or {}, verify=False)
 
             if mine_type == '4':
+                if RequestUtil.get_variable(body):
+                    body = prepare_dict_or_str(body)
+                    body = prepare_func(body)
+                else:
+                    body = prepare_func(body)
                 ret = requests.request("delete", url, json=body, headers=headers or {}, verify=False)
 
         if mine_type in ['3', '4'] and params:
-            if RequestUtil.get_variable(url):
-                url = prepare_dict_or_str(url)
+            # if RequestUtil.get_variable(url):
+            #     url = prepare_dict_or_str(url)
             ret = requests.request(method="delete", url=url, verify=False, headers=headers)
 
     return ret
@@ -231,6 +297,20 @@ def prepare_dict_or_str(data):
         const_kwargs = {item.get("name"): item.get("variable_value") for item in queryset}
         if isinstance(data, dict):
             data = RequestUtil.substitute_variable(data, const_kwargs=const_kwargs)
+
         if isinstance(data, str):
             data = RequestUtil.replace_str(data, const_kwargs)
         return data
+
+
+def prepare_func(data):
+    if "${{" not in json.dumps(data):
+       return data
+    else:
+        type = 1
+        if isinstance(data, str):
+            type = 0
+        if isinstance(data, dict):
+            type = 1
+        serial = hook_replace(data, type)
+    return serial
